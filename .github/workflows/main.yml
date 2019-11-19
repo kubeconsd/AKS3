@@ -18,7 +18,7 @@ jobs:
         docker build . -t kubeconsd3.azurecr.io/aksdemo:${{ github.sha }}
         docker push kubeconsd3.azurecr.io/aksdemo:${{ github.sha }}
     
-    # Set the target AKS cluster. 
+    # Set the target AKS cluster 2. 
     - uses: azure/aks-set-context@v1
       with:
         creds: '${{ secrets.AZURE_CREDENTIALS }}'
