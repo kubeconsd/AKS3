@@ -1,0 +1,53 @@
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    # Connect to Azure Container registry (ACR)
+    - uses: azure/docker-login@v1
+      with:
+        login-server: kubeconsd3.azurecr.io
+        username: ${{ secrets.REGISTRY_USERNAME }} 
+        password: ${{ secrets.REGISTRY_PASSWORD }}
+    
+    # Docker build and push to a Azure Container registry (ACR)
+    - run: |
+        docker build . -t kubeconsd3.azurecr.io/aksdemo:${{ github.sha }}
+        docker push kubeconsd3.azurecr.io/aksdemo:${{ github.sha }}
+    
+    # Set the target AKS cluster. 
+    - uses: azure/aks-set-context@v1
+      with:
+        creds: '${{ secrets.AZURE_CREDENTIALS }}'
+        cluster-name: kubeconsd3
+        resource-group: kubeconsd3
+    
+    - run: |
+        kubectl create namespace aksdemo --dry-run -o json | kubectl apply -f -
+    
+    # Create imagepullsecret for Azure Container registry (ACR)
+    - uses: azure/k8s-create-secret@v1
+      with:
+        container-registry-url: kubeconsd3.azurecr.io
+        container-registry-username: ${{ secrets.REGISTRY_USERNAME }}
+        container-registry-password: ${{ secrets.REGISTRY_PASSWORD }}
+        secret-name: demo-k8s-secret
+        namespace: aksdemo
+    
+    # Deploy app to AKS
+    - uses: azure/k8s-deploy@v1
+      with:
+        manifests: |
+          manifests/deployment.yml
+          manifests/service.yml
+        images: |
+          kubeconsd3.azurecr.io/aksdemo:${{ github.sha }}
+        imagepullsecrets: |
+          demo-k8s-secret
+        namespace: aksdemo
+
+    - run: |
+        kubectl get services -n aksdemo
